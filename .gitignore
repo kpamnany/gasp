@@ -1,3 +1,6 @@
+# VIM files
+.*.swp
+
 # Object files
 *.o
 *.ko
@@ -21,6 +24,8 @@
 *.dylib
 
 # Executables
+garraytest
+dtreetest
 *.exe
 *.out
 *.app
