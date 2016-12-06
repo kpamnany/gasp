@@ -11,8 +11,8 @@ Global Address SPace toolbox.
 The [Dtree](http://dx.doi.org/10.1007/978-3-319-20119-1_10) distributed dynamic scheduler, and a fast minimal implementation global
 arrays implementation with an interface based on [GA](http://hpc.pnl.gov/globalarrays/index.shtml).
 
-+ uses MPI-2 asynchronous communication and MPI-3 one-sided RMA
-+ runs on C11/Linux; tested on Cray machines and Intel clusters
++ MPI-2 asynchronous communication and MPI-3 one-sided RMA
++ C11/Linux; tested on Cray machines and Intel clusters
 
 ## Usage
 
