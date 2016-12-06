@@ -1,0 +1,17 @@
+sudo: required
+dist: trusty
+language: c
+os: linux
+compiler: mpicc
+notifications:
+  email: false
+env:
+  - MPICH_CC=gcc
+before_install:
+  - sudo apt-get -qq update
+  - sudo apt-get install -y mpich libmpich-dev
+script:
+  - make && make -C test garraytest
+  - cd test
+  - mpiexec.hydra -np 4 ./garraytest
+

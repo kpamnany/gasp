@@ -43,7 +43,6 @@ ifeq ($(INTEL),yes)
     CFLAGS+=-qopenmp
 endif
 
-
 ifneq ($(MKLROOT),)
     LDFLAGS+=-L$(MKLROOT)/lib/intel64
     LDFLAGS+=-lmkl_intel_ilp64
