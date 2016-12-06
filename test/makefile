@@ -3,9 +3,10 @@
 # makefile for tests
 #
 
-CRAY?=no
+CC=mpicc
 
-CC?=cc
+CRAY?=no
+INTEL?=no
 
 .SUFFIXES: .c .h .o
 .PHONY: clean
@@ -31,6 +32,7 @@ ifeq ($(shell uname), Darwin)
     #LDFLAGS+=-lgasp
     LDFLAGS+=../libgasp.dylib
 else
+    CFLAGS+=-fopenmp
     LDFLAGS+=../libgasp.so
 endif
 endif
@@ -38,6 +40,7 @@ endif
 ifeq ($(INTEL),yes)
     CC=mpiicc
     CFLAGS+=-mt_mpi
+    CFLAGS+=-qopenmp
 endif
 
 
@@ -67,7 +70,7 @@ garraytest: $(SRCS)
 	$(CC) $(CFLAGS) garraytest.c -o garraytest $(LDFLAGS)
 
 dtreetest: dtreetest.c
-	$(CC) $(CFLAGS) -openmp dtreetest.c -o dtreetest $(LDFLAGS)
+	$(CC) $(CFLAGS) dtreetest.c -o dtreetest $(LDFLAGS)
 
 clean:
 	$(RM) -f $(BINS) $(OBJS)

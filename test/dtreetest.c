@@ -43,13 +43,13 @@ void usage()
         fprintf(stderr, "Usage:\n"
                         "  dtreetest <#items> <mean> <stddev> \n"
                         "            <first> <rest> <mindist> \n"
-                        "            <parents_work> [<fanout=2048>]\n");
+                        "            <parents_work> [<fanout=1024>]\n");
 }
 
 
 int main(int argc, char **argv)
 {
-    int                 i, j, min_distrib, parents_work, fan_out = 2048,
+    int                 i, j, min_distrib, parents_work, fan_out = 1024,
                         is_parent;
     int64_t             num_work_items;
     double              mean, stddev, first, rest, cpu_mhz = get_cpu_mhz();

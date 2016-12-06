@@ -59,7 +59,7 @@ int64_t garray_create(gasp_t *g, int64_t ndims, int64_t *dims, int64_t elem_size
 
     *ga_ = ga;
 
-    LOG_INFO(g->glog, "[%d] garray created %lld-array, element size %lld\n",
+    LOG_INFO(g->glog, "[%d] garray created %ld-array, element size %ld\n",
              g->nid, ndims, elem_size);
 
     return 0;
@@ -75,7 +75,7 @@ void garray_destroy(garray_t *ga)
     MPI_Win_free(&ga->win);
     free(ga->dims);
 
-    LOG_INFO(ga->g->glog, "[%d] garray destroyed %lld-array, element size %lld\n",
+    LOG_INFO(ga->g->glog, "[%d] garray destroyed %ld-array, element size %ld\n",
              ga->g->nid, ga->ndims, ga->elem_size);
 
     free(ga);
@@ -162,7 +162,7 @@ static void calc_target(garray_t *ga, int64_t gidx, int64_t *tnid_, int64_t *tid
         res.quot = tnid; res.rem = tidx;
     }
 
-    LOG_DEBUG(ga->g->glog, "[%d] garray calc %lld, target %ld.%ld\n",
+    LOG_DEBUG(ga->g->glog, "[%d] garray calc %ld, target %ld.%ld\n",
               ga->g->nid, gidx, res.quot, res.rem);
 
     *tnid_ = res.quot;
@@ -183,7 +183,7 @@ int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
 
     /* is all requested data on the same target? */
     if (tlonid == thinid) {
-        LOG_DEBUG(ga->g->glog, "[%d] garray getting %lld-%lld, single target %lld.%lld\n",
+        LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld-%ld, single target %ld.%ld\n",
                   ga->g->nid, lo[0], hi[0], tlonid, tloidx);
 
         //MPI_Win_lock(MPI_LOCK_SHARED, tlonid, 0, ga->win);
@@ -199,7 +199,7 @@ int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
     /* get the data in the lo nid */
     n = ga->nelems_per_node + (tlonid < ga->nextra_elems ? 1 : 0) - tloidx;
 
-    LOG_DEBUG(ga->g->glog, "[%d] garray getting %lld elements from %lld.%lld\n",
+    LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld elements from %ld.%ld\n",
               ga->g->nid, n, tlonid, tloidx);
 
     //MPI_Win_lock(MPI_LOCK_SHARED, tlonid, 0, ga->win);
@@ -215,7 +215,7 @@ int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
     for (tnid = tlonid + 1;  tnid < thinid;  ++tnid) {
         n = ga->nelems_per_node + (tnid < ga->nextra_elems ? 1 : 0);
 
-        LOG_DEBUG(ga->g->glog, "[%d] garray getting %lld elements from %lld.%lld\n",
+        LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld elements from %ld.%ld\n",
                   ga->g->nid, n, tnid, tidx);
 
         //MPI_Win_lock(MPI_LOCK_SHARED, tnid, 0, ga->win);
@@ -230,7 +230,7 @@ int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
     /* get the data in the hi nid */
     n = thiidx + 1;
 
-    LOG_DEBUG(ga->g->glog, "[%d] garray getting %lld elements up to %lld.%lld\n",
+    LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld elements up to %ld.%ld\n",
               ga->g->nid, n, thinid, thiidx);
 
     //MPI_Win_lock(MPI_LOCK_SHARED, thinid, 0, ga->win);
@@ -257,7 +257,7 @@ int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
 
     /* is all data going to the same target? */
     if (tlonid == thinid) {
-        LOG_DEBUG(ga->g->glog, "[%d] garray put %lld-%lld, single target %lld.%lld\n",
+        LOG_DEBUG(ga->g->glog, "[%d] garray put %ld-%ld, single target %ld.%ld\n",
                   ga->g->nid, lo[0], hi[0], tlonid, tloidx);
 
         //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, tlonid, 0, ga->win);
@@ -273,7 +273,7 @@ int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
     /* put the data into the lo nid */
     n = ga->nelems_per_node + (tlonid < ga->nextra_elems ? 1 : 0) - tloidx;
 
-    LOG_DEBUG(ga->g->glog, "[%d] garray putting %lld elements into %lld.%lld\n",
+    LOG_DEBUG(ga->g->glog, "[%d] garray putting %ld elements into %ld.%ld\n",
               ga->g->nid, n, tlonid, tloidx);
 
     //MPI_Win_lock(MPI_LOCK_SHARED, tlonid, 0, ga->win);
@@ -289,7 +289,7 @@ int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
     for (tnid = tlonid + 1;  tnid < thinid;  ++tnid) {
         n = ga->nelems_per_node + (tnid < ga->nextra_elems ? 1 : 0);
 
-        LOG_DEBUG(ga->g->glog, "[%d] garray putting %lld elements into %lld.%lld\n",
+        LOG_DEBUG(ga->g->glog, "[%d] garray putting %ld elements into %ld.%ld\n",
                   ga->g->nid, n, tnid, tidx);
 
         //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, tnid, 0, ga->win);
@@ -304,7 +304,7 @@ int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
     /* put the data into the hi nid */
     n = thiidx + 1;
 
-    LOG_DEBUG(ga->g->glog, "[%d] garray putting %lld elements up to %lld.%lld\n",
+    LOG_DEBUG(ga->g->glog, "[%d] garray putting %ld elements up to %ld.%ld\n",
               ga->g->nid, n, thinid, thiidx);
 
     //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, thinid, 0, ga->win);
@@ -323,7 +323,7 @@ int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
 int64_t garray_distribution(garray_t *ga, int64_t nid, int64_t *lo, int64_t *hi)
 {
     if (nid >= ga->g->nnodes) {
-        LOG_WARN(ga->g->glog, "[%d] garray distribution requested for node %lld out"
+        LOG_WARN(ga->g->glog, "[%d] garray distribution requested for node %ld out"
                   " of %d nodes\n", ga->g->nid, nid, ga->g->nnodes);
         return -1;
     }
@@ -356,7 +356,7 @@ int64_t garray_access(garray_t *ga, int64_t *lo, int64_t *hi, void **buf)
     int64_t lo_ofs = lo[0]-mylo[0], hi_ofs = hi[0]-myhi[0];
     if (lo_ofs < 0  ||  hi_ofs > 0) {
         LOG_WARN(ga->g->glog, "[%d] garray access requested for invalid range"
-                 " (%lld-%lld, have %lld-%lld)\n", ga->g->nid, lo[0], hi[0],
+                 " (%ld-%ld, have %ld-%ld)\n", ga->g->nid, lo[0], hi[0],
                  mylo[0], myhi[0]);
         return -1;
     }
