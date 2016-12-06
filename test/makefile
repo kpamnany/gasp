@@ -3,7 +3,7 @@
 # makefile for tests
 #
 
-CRAY?=yes
+CRAY?=no
 
 CC?=cc
 
@@ -25,8 +25,21 @@ ifeq ($(CRAY),yes)
     LDFLAGS+=-lgasp
     LDFLAGS+=-Wl,--whole-archive,-ldmapp,--no-whole-archive
 else
+ifeq ($(shell uname), Darwin)
+    #LDFLAGS+=-dynamic
+    #LDFLAGS+=-L..
+    #LDFLAGS+=-lgasp
+    LDFLAGS+=../libgasp.dylib
+else
     LDFLAGS+=../libgasp.so
 endif
+endif
+
+ifeq ($(INTEL),yes)
+    CC=mpiicc
+    CFLAGS+=-mt_mpi
+endif
+
 
 ifneq ($(MKLROOT),)
     LDFLAGS+=-L$(MKLROOT)/lib/intel64
@@ -50,10 +63,10 @@ endif
 
 all: $(BINS)
 
-garraytest: $(SRCS) ../libgasp.so
+garraytest: $(SRCS)
 	$(CC) $(CFLAGS) garraytest.c -o garraytest $(LDFLAGS)
 
-dtreetest: dtreetest.c ../libgasp.so
+dtreetest: dtreetest.c
 	$(CC) $(CFLAGS) -openmp dtreetest.c -o dtreetest $(LDFLAGS)
 
 clean:

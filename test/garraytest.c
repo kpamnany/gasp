@@ -29,7 +29,7 @@ int main(int argc, char **argv)
     nid = gasp_nodeid();
     nnodes = gasp_nnodes();
     if (nid == 0)
-        printf("gasptest -- %ld nodes\n", nnodes);
+        printf("gasptest -- %lld nodes\n", nnodes);
 
     /* even distribution global array tests */
     int64_t nelems = nnodes * 5;
@@ -38,7 +38,7 @@ int main(int argc, char **argv)
     garray_create(g, 1, dim1, sizeof (aelem_t), NULL, &ga);
 
     if (nid == 0)
-        printf("[%ld] even distribution global array tests\n", nid);
+        printf("[%lld] even distribution global array tests\n", nid);
     check_distrib_access_get(ga);
     check_put_get(ga);
 
@@ -50,7 +50,7 @@ int main(int argc, char **argv)
     garray_create(g, 1, dim1, sizeof (aelem_t), NULL, &ga);
 
     if (nid == 0)
-        printf("[%ld] uneven distribution global array tests\n", nid);
+        printf("[%lld] uneven distribution global array tests\n", nid);
     check_distrib_access_get(ga);
     check_put_get(ga);
 
@@ -95,7 +95,7 @@ void check_distrib_access_get(garray_t *ga)
         for (int64_t n = 0;  n < nnodes;  ++n) {
             int64_t lidx = (n * res.quot) + (n < res.rem ? n : res.rem);
             if (arr[lidx].rank != n) {
-                printf("array[%ld] != %ld\n", lidx, n);
+                printf("array[%lld] != %lld\n", lidx, n);
                 passed = 0;
             }
         }
@@ -138,7 +138,7 @@ void check_put_get(garray_t *ga)
         for (int64_t n = 0;  n < nnodes;  ++n) {
             int64_t lidx = (n * res.quot) + (n < res.rem ? n : res.rem);
             if (arr[lidx].idx != 100 + srcn) {
-                printf("array[%ld].idx != %ld]\n", lidx, 100 + srcn);
+                printf("array[%lld].idx != %lld]\n", lidx, 100 + srcn);
                 passed = 0;
             }
             srcn = (srcn + 1) % nnodes;
