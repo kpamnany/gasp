@@ -122,6 +122,8 @@ int dtree_run(dtree_t *dt);
 /* utility helpers */
 uint64_t rdtsc();
 void cpu_pause();
+void start_sde_tracing();
+void stop_sde_tracing();
 
 #endif  /* _GASP_H */
 

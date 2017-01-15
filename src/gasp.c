@@ -100,3 +100,15 @@ inline void __attribute__((always_inline)) cpu_pause()
     _mm_pause();
 }
 
+
+inline void __attribute__((always_inline)) start_sde_tracing()
+{
+    __SSC_MARK(0x111);
+}
+
+
+inline void __attribute__((always_inline)) stop_sde_tracing()
+{
+    __SSC_MARK(0x222);
+}
+
