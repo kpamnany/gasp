@@ -18,13 +18,19 @@ CFLAGS+=-fpic
 CFLAGS+=-I.
 CFLAGS+=-I../include
 CFLAGS+=-I../src
-CFLAGS+=-I$(INCLUDE)
+ifdef $(INCLUDE)
+    CFLAGS+=-I$(INCLUDE)
+endif
 
 ifeq ($(CRAY),yes)
+    CC=cc
+    #CFLAGS+=-craympich-mt
+    CFLAGS+=-fopenmp
     LDFLAGS+=-dynamic
     LDFLAGS+=-L..
     LDFLAGS+=-lgasp
     LDFLAGS+=-Wl,--whole-archive,-ldmapp,--no-whole-archive
+    LDFLAGS+=-Wl,-rpath=/global/u1/k/kpamnany/mpich2-intel/lib
 else
 ifeq ($(shell uname), Darwin)
     #LDFLAGS+=-dynamic

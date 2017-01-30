@@ -30,8 +30,8 @@ int64_t gasp_init(int ac, char **av, gasp_t **g_)
     //gasp_t *g = aligned_alloc(64, sizeof(gasp_t));
     gasp_t *g;
     posix_memalign((void **)&g, 64, sizeof(gasp_t));
-    g->nnodes = gasp_nnodes();
-    g->nid = gasp_nodeid();
+    g->nranks = gasp_nranks();
+    g->rank = gasp_rank();
     log_init(&g->glog, "GARRAY_LOG_LEVEL");
     log_init(&g->dlog, "DTREE_LOG_LEVEL");
     *g_ = g;
@@ -50,9 +50,9 @@ void gasp_shutdown(gasp_t *g)
 }
 
 
-/*  gasp_nnodes()
+/*  gasp_nranks()
  */
-int64_t gasp_nnodes()
+int64_t gasp_nranks()
 {
     int num_ranks;
     MPI_Comm_size(MPI_COMM_WORLD, &num_ranks);
@@ -60,9 +60,9 @@ int64_t gasp_nnodes()
 }
 
 
-/*  gasp_nodeid()
+/*  gasp_rank()
  */
-int64_t gasp_nodeid()
+int64_t gasp_rank()
 {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);

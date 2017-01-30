@@ -58,8 +58,8 @@ int main(int argc, char **argv)
     gasp_t             *g;
 
     gasp_init(argc, argv, &g);
-    num_ranks = gasp_nnodes();
-    my_rank = gasp_nodeid();
+    num_ranks = gasp_nranks();
+    my_rank = gasp_rank();
 
     if (argc < 8  ||  argc > 9) {
         usage();
@@ -112,7 +112,7 @@ int main(int argc, char **argv)
     if (my_rank == 0)
         printf("  generating random numbers...");
 
-    // generate random numbers for work item durations--on each node
+    // generate random numbers for work item durations--on each rank
     uint64_t *ticks = (uint64_t *)_mm_malloc(each * num_ranks * sizeof (uint64_t), 64);
 
     double *rnd, rm;
@@ -163,19 +163,19 @@ int main(int argc, char **argv)
     lock_init(lock);
 
     int can_parent = 1;
-    double node_mul = 1.0;
+    double rank_mul = 1.0;
 
 #if (__MIC__)
     // TODO: this is okay for hetero, but wrong for MIC-only
     can_parent = 0;
-    node_mul = 6.0;
+    rank_mul = 6.0;
 #endif
 
     if (my_rank == 0)
         printf("  creating tree...");
 
     dtree_create(g, fan_out, num_work_items, can_parent, parents_work,
-            node_mul, omp_get_max_threads(), omp_get_thread_num,
+            rank_mul, omp_get_max_threads(), omp_get_thread_num,
             first, rest, min_distrib, &scheduler, &is_parent);
 
     if (my_rank == 0)
@@ -234,7 +234,7 @@ int main(int argc, char **argv)
     uint64_t twork_done = rdtsc();
     double twork = ((double)(twork_done - tinit_done)) / (cpu_mhz * 1000);
 
-    // wait for all nodes to be done
+    // wait for all ranks to be done
     MPI_Barrier(MPI_COMM_WORLD);
 
     uint64_t tall_done = rdtsc();

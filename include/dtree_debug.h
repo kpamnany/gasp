@@ -19,11 +19,11 @@
 
 #if TRACE_DTREE == 1
 #define DTREE_TRACE(dt,x...)          \
-    if ((dt)->g->nid == 0 || (dt)->g->nid == (dt)->g->nnodes-1) \
+    if ((dt)->g->rank == 0 || (dt)->g->rank == (dt)->g->nranks-1) \
         fprintf(stderr, x)
 #elif TRACE_DTREE == 2
 #define DTREE_TRACE(dt,x...)          \
-    if ((dt)->g->nid < 18 || (dt)->g->nid > (dt)->g->nnodes-19) \
+    if ((dt)->g->rank < 18 || (dt)->g->rank > (dt)->g->nranks-19) \
         fprintf(stderr, x)
 #elif TRACE_DTREE == 3
 #define DTREE_TRACE(dt,x...)          \

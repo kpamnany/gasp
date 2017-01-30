@@ -24,14 +24,14 @@ See the paper linked above for details on Dtree parameters. See `test/dtreetest.
 #include "gasp.h"
 
 gasp_t *g;
-int64_t nid, nnodes;
+int64_t grank, ngranks;
 
 int main(int argc, char **argv)
 {
     /* initialize gasp */
     gasp_init(argc, argv, &g);
-    nid = gasp_nodeid();
-    nnodes = gasp_nnodes();
+    grank = gasp_rank();
+    ngranks = gasp_nranks();
 
     /* required scheduler parameters */
     int64_t num_work_items = 50000;
@@ -42,14 +42,14 @@ int main(int argc, char **argv)
     int fan_out = 1024;
     int can_parent = 1;
     int parents_work = 1;
-    double node_mul = 1.0;
+    double grank_mul = 1.0;
     double rest = 0.4;
 
     /* create the scheduler */
     dtree_t *scheduler;
     int is_parent;
     dtree_create(g, fan_out, num_work_items, can_parent, parents_work,
-            node_mul, omp_get_max_threads(), omp_get_thread_num,
+            grank_mul, omp_get_max_threads(), omp_get_thread_num,
             first, rest, min_distrib, &scheduler, &is_parent);
 
     /* get initial work allocation */
@@ -112,7 +112,7 @@ See Global Arrays documentation for PGAS model and concepts. See `test/garraytes
 #include "gasp.h"
 
 gasp_t *g;
-int64_t nid, nnodes;
+int64_t grank, ngranks;
 
 typedef struct aelem {
     int64_t a, b;
@@ -122,42 +122,42 @@ int main(int argc, char **argv)
 {
     /* initialize gasp */
     gasp_init(argc, argv, &g);
-    nid = gasp_nodeid();
-    nnodes = gasp_nnodes();
+    grank = gasp_rank();
+    ngranks = gasp_nranks();
 
     /* create a global array; currently only 1-dimensional arrays
        are supported, and chunks cannot be specified */
     garray_t *ga;
-    int64_t nelems = nnodes * 100;
+    int64_t nelems = ngranks * 100;
     int64_t dim[1] = { nelems };
     garray_create(g, 1, dim, sizeof(aelem_t), NULL, &ga);
 
     /* get the local part of the global array; lo-hi inclusive */
     int64_t lo[1], hi[1];
-    garray_distribution(ga, nid, lo, hi);
+    garray_distribution(ga, grank, lo, hi);
 
     int64_t nlocal_elems = hi[0] - lo[0] + 1;
 
     aelem_t *aptr;
     garray_access(ga, lo, hi, (void **)&aptr);
     for (int64_t i = 0;  i < nlocal_elems;  ++i) {
-        aptr[i].a = (i + 1) * nid;
-        aptr[i].b = nid;
+        aptr[i].a = (i + 1) * grank;
+        aptr[i].b = grank;
     }
     garray_flush(ga);
 
-    /* wait for all nodes to complete */
+    /* wait for all ranks to complete */
     gasp_sync();
 
-    /* put into the next node's first element */
+    /* put into the next rank's first element */
     aelem_t tae;
-    tae.a = 100 + nid;
-    tae.b = nid;
+    tae.a = 100 + grank;
+    tae.b = grank;
     int64_t ti[1];
     ti[0] = (hi[0] + 1) % nelems;
     garray_put(ga, ti, ti, &tae);
 
-    /* wait for all nodes to complete */
+    /* wait for all ranks to complete */
     gasp_sync();
 
     /* destroy the global array */

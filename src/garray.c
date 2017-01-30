@@ -37,10 +37,10 @@ int64_t garray_create(gasp_t *g, int64_t ndims, int64_t *dims, int64_t elem_size
     ga->g = g;
 
     /* distribution of elements */
-    ldiv_t res = ldiv(dims[0], g->nnodes);
+    ldiv_t res = ldiv(dims[0], g->nranks);
     ga->nextra_elems = res.rem;
-    ga->nelems_per_node = ga->nlocal_elems = res.quot;
-    if (g->nid < ga->nextra_elems)
+    ga->nelems_per_rank = ga->nlocal_elems = res.quot;
+    if (g->rank < ga->nextra_elems)
         ++ga->nlocal_elems;
 
     /* fill in array info */
@@ -60,7 +60,7 @@ int64_t garray_create(gasp_t *g, int64_t ndims, int64_t *dims, int64_t elem_size
     *ga_ = ga;
 
     LOG_INFO(g->glog, "[%d] garray created %ld-array, element size %ld\n",
-             g->nid, ndims, elem_size);
+             g->rank, ndims, elem_size);
 
     return 0;
 }
@@ -76,7 +76,7 @@ void garray_destroy(garray_t *ga)
     free(ga->dims);
 
     LOG_INFO(ga->g->glog, "[%d] garray destroyed %ld-array, element size %ld\n",
-             ga->g->nid, ga->ndims, ga->elem_size);
+             ga->g->rank, ga->ndims, ga->elem_size);
 
     free(ga);
 }
@@ -116,33 +116,33 @@ int64_t garray_size(garray_t *ga, int64_t *dims)
 
 /*  calc_target()
  */
-static void calc_target(garray_t *ga, int64_t gidx, int64_t *tnid_, int64_t *tidx_)
+static void calc_target(garray_t *ga, int64_t gidx, int64_t *trank_, int64_t *tidx_)
 {
-    /* if this node has no local elements, there are less than nnodes
-       elements, so the array index is the node index */
+    /* if this rank has no local elements, there are less than nranks
+       elements, so the array index is the rank index */
     if (ga->nlocal_elems == 0) {
-        *tnid_ = gidx;
+        *trank_ = gidx;
         *tidx_ = 0;
         return;
     }
 
-    /* compute the target nid+idx */
+    /* compute the target rank+idx */
     ldiv_t res = ldiv(gidx, ga->nlocal_elems);
 
     /* if the distribution is not perfectly even, we have to adjust
-       the target nid+idx appropriately */
+       the target rank+idx appropriately */
     if (ga->nextra_elems > 0) {
-        int64_t tnid = res.quot, tidx = res.rem;
+        int64_t trank = res.quot, tidx = res.rem;
 
         /* if i have an extra element... */
-        if (ga->g->nid < ga->nextra_elems) {
+        if (ga->g->rank < ga->nextra_elems) {
             /* but the target does not */
-            if (tnid >= ga->nextra_elems) {
+            if (trank >= ga->nextra_elems) {
                 /* then the target index has to be adjusted upwards */
-                tidx += (tnid - ga->nextra_elems);
-                /* which may mean that the target nid does too */
+                tidx += (trank - ga->nextra_elems);
+                /* which may mean that the target rank does too */
                 while (tidx >= (ga->nlocal_elems - 1)) {
-                    ++tnid;
+                    ++trank;
                     tidx -= (ga->nlocal_elems - 1);
                 }
             }
@@ -151,21 +151,21 @@ static void calc_target(garray_t *ga, int64_t gidx, int64_t *tnid_, int64_t *tid
         /* i don't have an extra element... */
         else {
             /* so adjust the target index downwards */
-            tidx -= (tnid < ga->nextra_elems ? tnid : ga->nextra_elems);
-            /* which may mean the target nid has to be adjusted too */
+            tidx -= (trank < ga->nextra_elems ? trank : ga->nextra_elems);
+            /* which may mean the target rank has to be adjusted too */
             while (tidx < 0) {
-                --tnid;
-                tidx += ga->nelems_per_node + (tnid < ga->nextra_elems ? 1 : 0);
+                --trank;
+                tidx += ga->nelems_per_rank + (trank < ga->nextra_elems ? 1 : 0);
             }
         }
 
-        res.quot = tnid; res.rem = tidx;
+        res.quot = trank; res.rem = tidx;
     }
 
     LOG_DEBUG(ga->g->glog, "[%d] garray calc %ld, target %ld.%ld\n",
-              ga->g->nid, gidx, res.quot, res.rem);
+              ga->g->rank, gidx, res.quot, res.rem);
 
-    *tnid_ = res.quot;
+    *trank_ = res.quot;
     *tidx_ = res.rem;
 }
 
@@ -175,69 +175,69 @@ static void calc_target(garray_t *ga, int64_t gidx, int64_t *tnid_, int64_t *tid
 int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
 {
     int64_t count = (hi[0] - lo[0]) + 1, length = count * ga->elem_size,
-            tlonid, tloidx, thinid, thiidx, tnid, tidx, n, oidx = 0;
+            tlorank, tloidx, thirank, thiidx, trank, tidx, n, oidx = 0;
     int8_t *buf = (int8_t *)buf_;
 
-    calc_target(ga, lo[0], &tlonid, &tloidx);
-    calc_target(ga, hi[0], &thinid, &thiidx);
+    calc_target(ga, lo[0], &tlorank, &tloidx);
+    calc_target(ga, hi[0], &thirank, &thiidx);
 
     /* is all requested data on the same target? */
-    if (tlonid == thinid) {
+    if (tlorank == thirank) {
         LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld-%ld, single target %ld.%ld\n",
-                  ga->g->nid, lo[0], hi[0], tlonid, tloidx);
+                  ga->g->rank, lo[0], hi[0], tlorank, tloidx);
 
-        //MPI_Win_lock(MPI_LOCK_SHARED, tlonid, 0, ga->win);
+        //MPI_Win_lock(MPI_LOCK_SHARED, tlorank, 0, ga->win);
         MPI_Get(buf, length, MPI_INT8_T,
-                tlonid, (tloidx * ga->elem_size), length, MPI_INT8_T,
+                tlorank, (tloidx * ga->elem_size), length, MPI_INT8_T,
                 ga->win);
-        //MPI_Win_unlock(tlonid, ga->win);
-        MPI_Win_flush_local(tlonid, ga->win);
+        //MPI_Win_unlock(tlorank, ga->win);
+        MPI_Win_flush_local(tlorank, ga->win);
 
         return 0;
     }
 
-    /* get the data in the lo nid */
-    n = ga->nelems_per_node + (tlonid < ga->nextra_elems ? 1 : 0) - tloidx;
+    /* get the data in the lo rank */
+    n = ga->nelems_per_rank + (tlorank < ga->nextra_elems ? 1 : 0) - tloidx;
 
     LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld elements from %ld.%ld\n",
-              ga->g->nid, n, tlonid, tloidx);
+              ga->g->rank, n, tlorank, tloidx);
 
-    //MPI_Win_lock(MPI_LOCK_SHARED, tlonid, 0, ga->win);
+    //MPI_Win_lock(MPI_LOCK_SHARED, tlorank, 0, ga->win);
     MPI_Get(buf, (n * ga->elem_size), MPI_INT8_T,
-            tlonid, (tloidx * ga->elem_size), (n * ga->elem_size), MPI_INT8_T,
+            tlorank, (tloidx * ga->elem_size), (n * ga->elem_size), MPI_INT8_T,
             ga->win);
-    //MPI_Win_unlock(tlonid, ga->win);
+    //MPI_Win_unlock(tlorank, ga->win);
 
     oidx = (n * ga->elem_size);
 
-    /* get the data in the in-between nids */
+    /* get the data in the in-between ranks */
     tidx = 0;
-    for (tnid = tlonid + 1;  tnid < thinid;  ++tnid) {
-        n = ga->nelems_per_node + (tnid < ga->nextra_elems ? 1 : 0);
+    for (trank = tlorank + 1;  trank < thirank;  ++trank) {
+        n = ga->nelems_per_rank + (trank < ga->nextra_elems ? 1 : 0);
 
         LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld elements from %ld.%ld\n",
-                  ga->g->nid, n, tnid, tidx);
+                  ga->g->rank, n, trank, tidx);
 
-        //MPI_Win_lock(MPI_LOCK_SHARED, tnid, 0, ga->win);
+        //MPI_Win_lock(MPI_LOCK_SHARED, trank, 0, ga->win);
         MPI_Get(&buf[oidx], (n * ga->elem_size), MPI_INT8_T,
-                tnid, 0, (n * ga->elem_size), MPI_INT8_T,
+                trank, 0, (n * ga->elem_size), MPI_INT8_T,
                 ga->win);
-        //MPI_Win_unlock(tnid, ga->win);
+        //MPI_Win_unlock(trank, ga->win);
 
         oidx += (n * ga->elem_size);
     }
 
-    /* get the data in the hi nid */
+    /* get the data in the hi rank */
     n = thiidx + 1;
 
     LOG_DEBUG(ga->g->glog, "[%d] garray getting %ld elements up to %ld.%ld\n",
-              ga->g->nid, n, thinid, thiidx);
+              ga->g->rank, n, thirank, thiidx);
 
-    //MPI_Win_lock(MPI_LOCK_SHARED, thinid, 0, ga->win);
+    //MPI_Win_lock(MPI_LOCK_SHARED, thirank, 0, ga->win);
     MPI_Get(&buf[oidx], (n * ga->elem_size), MPI_INT8_T,
-            thinid, 0, (n * ga->elem_size), MPI_INT8_T,
+            thirank, 0, (n * ga->elem_size), MPI_INT8_T,
             ga->win);
-    //MPI_Win_unlock(thinid, ga->win);
+    //MPI_Win_unlock(thirank, ga->win);
     MPI_Win_flush_local_all(ga->win);
 
     return 0;
@@ -249,69 +249,69 @@ int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
 int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
 {
     int64_t count = (hi[0] - lo[0]) + 1, length = count * ga->elem_size,
-            tlonid, tloidx, thinid, thiidx, tnid, tidx, n, oidx = 0;
+            tlorank, tloidx, thirank, thiidx, trank, tidx, n, oidx = 0;
     int8_t *buf = (int8_t *)buf_;
 
-    calc_target(ga, lo[0], &tlonid, &tloidx);
-    calc_target(ga, hi[0], &thinid, &thiidx);
+    calc_target(ga, lo[0], &tlorank, &tloidx);
+    calc_target(ga, hi[0], &thirank, &thiidx);
 
     /* is all data going to the same target? */
-    if (tlonid == thinid) {
+    if (tlorank == thirank) {
         LOG_DEBUG(ga->g->glog, "[%d] garray put %ld-%ld, single target %ld.%ld\n",
-                  ga->g->nid, lo[0], hi[0], tlonid, tloidx);
+                  ga->g->rank, lo[0], hi[0], tlorank, tloidx);
 
-        //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, tlonid, 0, ga->win);
+        //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, tlorank, 0, ga->win);
         MPI_Put(buf, length, MPI_INT8_T,
-                tlonid, (tloidx * ga->elem_size), length, MPI_INT8_T,
+                tlorank, (tloidx * ga->elem_size), length, MPI_INT8_T,
                 ga->win);
-        //MPI_Win_unlock(tlonid, ga->win);
-        MPI_Win_flush(tlonid, ga->win);
+        //MPI_Win_unlock(tlorank, ga->win);
+        MPI_Win_flush(tlorank, ga->win);
 
         return 0;
     }
 
-    /* put the data into the lo nid */
-    n = ga->nelems_per_node + (tlonid < ga->nextra_elems ? 1 : 0) - tloidx;
+    /* put the data into the lo rank */
+    n = ga->nelems_per_rank + (tlorank < ga->nextra_elems ? 1 : 0) - tloidx;
 
     LOG_DEBUG(ga->g->glog, "[%d] garray putting %ld elements into %ld.%ld\n",
-              ga->g->nid, n, tlonid, tloidx);
+              ga->g->rank, n, tlorank, tloidx);
 
-    //MPI_Win_lock(MPI_LOCK_SHARED, tlonid, 0, ga->win);
+    //MPI_Win_lock(MPI_LOCK_SHARED, tlorank, 0, ga->win);
     MPI_Put(buf, length, MPI_INT8_T,
-            tlonid, (tloidx * ga->elem_size), (n * ga->elem_size), MPI_INT8_T,
+            tlorank, (tloidx * ga->elem_size), (n * ga->elem_size), MPI_INT8_T,
             ga->win);
-    //MPI_Win_unlock(tlonid, ga->win);
+    //MPI_Win_unlock(tlorank, ga->win);
 
     oidx = (n*ga->elem_size);
 
-    /* put the data into the in-between nids */
+    /* put the data into the in-between ranks */
     tidx = 0;
-    for (tnid = tlonid + 1;  tnid < thinid;  ++tnid) {
-        n = ga->nelems_per_node + (tnid < ga->nextra_elems ? 1 : 0);
+    for (trank = tlorank + 1;  trank < thirank;  ++trank) {
+        n = ga->nelems_per_rank + (trank < ga->nextra_elems ? 1 : 0);
 
         LOG_DEBUG(ga->g->glog, "[%d] garray putting %ld elements into %ld.%ld\n",
-                  ga->g->nid, n, tnid, tidx);
+                  ga->g->rank, n, trank, tidx);
 
-        //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, tnid, 0, ga->win);
+        //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, trank, 0, ga->win);
         MPI_Put(&buf[oidx], (n * ga->elem_size), MPI_INT8_T,
-                tnid, 0, (n * ga->elem_size), MPI_INT8_T,
+                trank, 0, (n * ga->elem_size), MPI_INT8_T,
                 ga->win);
-        //MPI_Win_unlock(tnid, ga->win);
+        //MPI_Win_unlock(trank, ga->win);
 
         oidx += (n*ga->elem_size);
     }
 
-    /* put the data into the hi nid */
+    /* put the data into the hi rank */
     n = thiidx + 1;
 
     LOG_DEBUG(ga->g->glog, "[%d] garray putting %ld elements up to %ld.%ld\n",
-              ga->g->nid, n, thinid, thiidx);
+              ga->g->rank, n, thirank, thiidx);
 
-    //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, thinid, 0, ga->win);
+    //MPI_Win_lock(MPI_LOCK_EXCLUSIVE, thirank, 0, ga->win);
     MPI_Put(&buf[oidx], (n * ga->elem_size), MPI_INT8_T,
-            thinid, 0, (n * ga->elem_size), MPI_INT8_T,
+            thirank, 0, (n * ga->elem_size), MPI_INT8_T,
             ga->win);
-    //MPI_Win_unlock(thinid, ga->win);
+    //MPI_Win_unlock(thirank, ga->win);
     MPI_Win_flush_all(ga->win);
 
     return 0;
@@ -320,25 +320,25 @@ int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf_)
 
 /*  garray_distribution()
  */
-int64_t garray_distribution(garray_t *ga, int64_t nid, int64_t *lo, int64_t *hi)
+int64_t garray_distribution(garray_t *ga, int64_t rank, int64_t *lo, int64_t *hi)
 {
-    if (nid >= ga->g->nnodes) {
-        LOG_WARN(ga->g->glog, "[%d] garray distribution requested for node %ld out"
-                  " of %d nodes\n", ga->g->nid, nid, ga->g->nnodes);
+    if (rank >= ga->g->nranks) {
+        LOG_WARN(ga->g->glog, "[%d] garray distribution requested for rank %ld out"
+                  " of %d ranks\n", ga->g->rank, rank, ga->g->nranks);
         return -1;
     }
 
     int64_t a1, a2;
-    if (nid < ga->nextra_elems) {
-        a1 = nid;
+    if (rank < ga->nextra_elems) {
+        a1 = rank;
         a2 = 1;
     }
     else {
         a1 = ga->nextra_elems;
         a2 = 0;
     }
-    lo[0] = nid * ga->nelems_per_node + a1;
-    hi[0] = lo[0] + ga->nelems_per_node + a2 - 1; /* inclusive */
+    lo[0] = rank * ga->nelems_per_rank + a1;
+    hi[0] = lo[0] + ga->nelems_per_rank + a2 - 1; /* inclusive */
 
     return 0;
 }
@@ -351,12 +351,12 @@ int64_t garray_access(garray_t *ga, int64_t *lo, int64_t *hi, void **buf)
     *buf = NULL;
 
     int64_t mylo[GARRAY_MAX_DIMS], myhi[GARRAY_MAX_DIMS];
-    garray_distribution(ga, ga->g->nid, mylo, myhi);
+    garray_distribution(ga, ga->g->rank, mylo, myhi);
 
     int64_t lo_ofs = lo[0]-mylo[0], hi_ofs = hi[0]-myhi[0];
     if (lo_ofs < 0  ||  hi_ofs > 0) {
         LOG_WARN(ga->g->glog, "[%d] garray access requested for invalid range"
-                 " (%ld-%ld, have %ld-%ld)\n", ga->g->nid, lo[0], hi[0],
+                 " (%ld-%ld, have %ld-%ld)\n", ga->g->rank, lo[0], hi[0],
                  mylo[0], myhi[0]);
         return -1;
     }
@@ -365,7 +365,7 @@ int64_t garray_access(garray_t *ga, int64_t *lo, int64_t *hi, void **buf)
         *buf = &ga->buffer[lo_ofs*ga->elem_size];
     else
         LOG_INFO(ga->g->glog, "[%d] garray access requested, but no local"
-                 " elements\n", ga->g->nid);
+                 " elements\n", ga->g->rank);
 
     return 0;
 }

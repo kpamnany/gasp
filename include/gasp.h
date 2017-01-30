@@ -17,7 +17,7 @@
 
 /* gasp handle */
 typedef struct gasp_tag {
-    int nnodes, nid;
+    int nranks, rank;
     log_t glog, dlog;
 } gasp_t;
 
@@ -25,7 +25,7 @@ typedef struct gasp_tag {
 /* global array */
 typedef struct garray_tag {
     gasp_t     *g;
-    int64_t     ndims, *dims, *chunks, elem_size, nextra_elems, nelems_per_node,
+    int64_t     ndims, *dims, *chunks, elem_size, nextra_elems, nelems_per_rank,
                 nlocal_elems;
     int8_t      *buffer;
     MPI_Win     win;
@@ -61,7 +61,7 @@ typedef struct dtree_tag {
     int64_t volatile    work_lock __attribute((aligned(8)));
 
     /* for heterogeneous clusters */
-    double              node_mul;
+    double              rank_mul;
 
     /* concurrent calls in from how many threads? */
     int                 num_threads;
@@ -80,11 +80,11 @@ int64_t gasp_init(int ac, char **av, gasp_t **g);
 void gasp_shutdown(gasp_t *g);
 void gasp_sync();
 
-/* number of participating nodes */
-int64_t gasp_nnodes();
+/* number of participating ranks */
+int64_t gasp_nranks();
 
-/* this node's unique identifier */
-int64_t gasp_nodeid();
+/* this rank's unique identifier */
+int64_t gasp_rank();
 
 /* global array */
 int64_t garray_create(gasp_t *g, int64_t ndims, int64_t *dims, int64_t elem_size,
@@ -98,14 +98,14 @@ int64_t garray_size(garray_t *ga, int64_t *dims);
 int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf);
 int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf);
 
-int64_t garray_distribution(garray_t *ga, int64_t nid, int64_t *lo, int64_t *hi);
+int64_t garray_distribution(garray_t *ga, int64_t rank, int64_t *lo, int64_t *hi);
 int64_t garray_access(garray_t *ga, int64_t *lo, int64_t *hi, void **buf);
 
 void garray_flush(garray_t *ga);
 
 /* dtree */
 int dtree_create(gasp_t *g, int fan_out, int64_t num_work_items,
-        int can_parent, int parents_work, double node_mul,
+        int can_parent, int parents_work, double rank_mul,
         int num_threads, int (*threadid)(),
         double first, double rest, int16_t min_distrib, dtree_t **dt, int *is_parent);
 void dtree_destroy(dtree_t *dt);
