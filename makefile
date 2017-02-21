@@ -8,6 +8,10 @@ CC=mpicc
 CRAY?=no
 INTEL?=no
 
+ifneq ($(wildcard /opt/cray/.),)
+    CRAY=yes
+endif
+
 .SUFFIXES: .c .h .o .a
 .PHONY: clean test
 
@@ -18,9 +22,17 @@ CFLAGS+=-fpic
 CFLAGS+=-I./include
 CFLAGS+=-I./src
 
+ifdef TRACE_DTREE
+    CFLAGS+=-DTRACE_DTREE=$(TRACE_DTREE)
+endif
+ifdef SHOW_DTREE
+    CFLAGS+=-DSHOW_DTREE=1
+endif
+
 ifeq ($(CRAY),yes)
     CC=cc
     #CFLAGS+=-craympich-mt
+    CFLAGS+=-DSDE_TRACING=1
     LDFLAGS+=-Wl,--whole-archive,-ldmapp,--no-whole-archive
     LDFLAGS+=-Wl,-rpath=/global/u1/k/kpamnany/mpich2-intel/lib
 endif
@@ -28,6 +40,7 @@ endif
 ifeq ($(INTEL),yes)
     CC=mpiicc
     CFLAGS+=-mt_mpi
+    CFLAGS+=-DSDE_TRACING=1
 endif
 
 SRCS=src/gasp.c src/garray.c src/dtree.c src/log.c

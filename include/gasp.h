@@ -13,7 +13,6 @@
 #include "dtree_debug.h"
 #include "log.h"
 
-#define GARRAY_MAX_DIMS         1
 
 /* gasp handle */
 typedef struct gasp_tag {
@@ -25,7 +24,7 @@ typedef struct gasp_tag {
 /* global array */
 typedef struct garray_tag {
     gasp_t     *g;
-    int64_t     ndims, *dims, *chunks, elem_size, nextra_elems, nelems_per_rank,
+    int64_t     num_elems, *chunks, elem_size, nextra_elems, nelems_per_rank,
                 nlocal_elems;
     int8_t      *buffer;
     MPI_Win     win;
@@ -46,7 +45,6 @@ typedef struct dtree_tag {
     double              tot_children;
 
     /* MPI info */
-    int                 my_rank, num_ranks;
     int16_t             *children_req_bufs;
     MPI_Request         parent_req, *children_reqs;
 
@@ -76,54 +74,54 @@ typedef struct dtree_tag {
 /* gasp interface
  */
 
-int64_t gasp_init(int ac, char **av, gasp_t **g);
-void gasp_shutdown(gasp_t *g);
-void gasp_sync();
+int      gasp_init(int ac, char **av, gasp_t **g);
+void     gasp_shutdown(gasp_t *g);
+void     gasp_sync();
 
 /* number of participating ranks */
-int64_t gasp_nranks();
+int      gasp_nranks();
 
 /* this rank's unique identifier */
-int64_t gasp_rank();
+int      gasp_rank();
 
 /* global array */
-int64_t garray_create(gasp_t *g, int64_t ndims, int64_t *dims, int64_t elem_size,
-        int64_t *chunks, garray_t **ga);
-void garray_destroy(garray_t *ga);
+int      garray_create(gasp_t *g, int64_t num_elems, int64_t elem_size,
+                       int64_t *chunks, garray_t **ga);
+void     garray_destroy(garray_t *ga);
 
-int64_t garray_ndims(garray_t *ga);
-int64_t garray_length(garray_t *ga);
-int64_t garray_size(garray_t *ga, int64_t *dims);
+int64_t  garray_length(garray_t *ga);
+int64_t  garray_elemsize(garray_t *ga);
 
-int64_t garray_get(garray_t *ga, int64_t *lo, int64_t *hi, void *buf);
-int64_t garray_put(garray_t *ga, int64_t *lo, int64_t *hi, void *buf);
+int      garray_get(garray_t *ga, int64_t lo, int64_t hi, void *buf);
+int      garray_put(garray_t *ga, int64_t lo, int64_t hi, void *buf);
 
-int64_t garray_distribution(garray_t *ga, int64_t rank, int64_t *lo, int64_t *hi);
-int64_t garray_access(garray_t *ga, int64_t *lo, int64_t *hi, void **buf);
+int      garray_distribution(garray_t *ga, int rank, int64_t *lo, int64_t *hi);
+int      garray_access(garray_t *ga, int64_t lo, int64_t hi, void **buf);
 
-void garray_flush(garray_t *ga);
+void     garray_flush(garray_t *ga);
 
 /* dtree */
-int dtree_create(gasp_t *g, int fan_out, int64_t num_work_items,
-        int can_parent, int parents_work, double rank_mul,
-        int num_threads, int (*threadid)(),
-        double first, double rest, int16_t min_distrib, dtree_t **dt, int *is_parent);
-void dtree_destroy(dtree_t *dt);
+int      dtree_create(gasp_t *g, int fan_out, int64_t num_work_items,
+                      int can_parent, int parents_work, double rank_mul,
+                      int num_threads, int (*threadid)(),
+                      double first, double rest, int16_t min_distrib,
+                      dtree_t **dt, int *is_parent);
+void     dtree_destroy(dtree_t *dt);
 
 /* call to get initial work allocation; before dtree_run() is called */
-int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item);
+int64_t  dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item);
 
 /* get a block of work */
-int64_t dtree_getwork(dtree_t *dt, int64_t *first_item, int64_t *last_item);
+int64_t  dtree_getwork(dtree_t *dt, int64_t *first_item, int64_t *last_item);
 
 /* call from a thread repeatedly until it returns 0 */
-int dtree_run(dtree_t *dt);
+int      dtree_run(dtree_t *dt);
 
 /* utility helpers */
 uint64_t rdtsc();
-void cpu_pause();
-void start_sde_tracing();
-void stop_sde_tracing();
+void     cpu_pause();
+void     start_sde_tracing();
+void     stop_sde_tracing();
 
 #endif  /* _GASP_H */
 
