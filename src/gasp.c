@@ -18,7 +18,7 @@ static int mpi_was_initialized = 0;
 
 /*  gasp_init()
  */
-int64_t gasp_init(int ac, char **av, gasp_t **g_)
+int gasp_init(int ac, char **av, gasp_t **g_)
 {
     MPI_Initialized(&mpi_was_initialized);
 
@@ -28,8 +28,14 @@ int64_t gasp_init(int ac, char **av, gasp_t **g_)
     }
 
     //gasp_t *g = aligned_alloc(64, sizeof(gasp_t));
+    int r;
     gasp_t *g;
-    posix_memalign((void **)&g, 64, sizeof(gasp_t));
+    r = posix_memalign((void **)&g, 64, sizeof(gasp_t));
+    if (r != 0) {
+        if (!mpi_was_initialized)
+            MPI_Finalize();
+        return r;
+    }
     g->nranks = gasp_nranks();
     g->rank = gasp_rank();
     log_init(&g->glog, "GARRAY_LOG_LEVEL");
@@ -52,7 +58,7 @@ void gasp_shutdown(gasp_t *g)
 
 /*  gasp_nranks()
  */
-int64_t gasp_nranks()
+int gasp_nranks()
 {
     int num_ranks;
     MPI_Comm_size(MPI_COMM_WORLD, &num_ranks);
@@ -62,7 +68,7 @@ int64_t gasp_nranks()
 
 /*  gasp_rank()
  */
-int64_t gasp_rank()
+int gasp_rank()
 {
     int my_rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -103,12 +109,16 @@ inline void __attribute__((always_inline)) cpu_pause()
 
 inline void __attribute__((always_inline)) start_sde_tracing()
 {
+#ifdef SDE_TRACING
     __SSC_MARK(0x111);
+#endif
 }
 
 
 inline void __attribute__((always_inline)) stop_sde_tracing()
 {
+#ifdef SDE_TRACING
     __SSC_MARK(0x222);
+#endif
 }
 

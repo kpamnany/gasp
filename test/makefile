@@ -8,6 +8,10 @@ CC=mpicc
 CRAY?=no
 INTEL?=no
 
+ifneq ($(wildcard /opt/cray/.),)
+    CRAY=yes
+endif
+
 .SUFFIXES: .c .h .o
 .PHONY: clean
 

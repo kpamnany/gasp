@@ -257,7 +257,8 @@ static void init_distrib_fractions(dtree_t *dt)
         dt->distrib_fractions[0] = 1.0;
 
         /* report rank multiplier */
-        MPI_Send(&dt->rank_mul, 1, MPI_DOUBLE, dt->parent, 0, MPI_COMM_WORLD);
+        if (dt->parent != -1)
+            MPI_Send(&dt->rank_mul, 1, MPI_DOUBLE, dt->parent, 0, MPI_COMM_WORLD);
     }
 
     /* reports work their way up */
@@ -349,7 +350,7 @@ int dtree_create(gasp_t *g,
     if (dt->num_children) {
         printf("[%04d] parent=[%04d], #children=%d (",
                dt->g->rank, dt->parent, dt->num_children);
-        for (i = 0;  i < dt->num_children-1;  i++)
+        for (int i = 0;  i < dt->num_children-1;  i++)
             printf("%d,", dt->children[i]);
         printf("%d)\n", dt->children[dt->num_children-1]);
     }
