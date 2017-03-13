@@ -130,12 +130,12 @@ int main(int argc, char **argv)
         vdRngGaussian(VSL_RNG_METHOD_GAUSSIAN_BOXMULLER2, stream,
                       each, rnd, rm, stddev);
         for (j = 0;  j < each;  j++)
-            ticks[cur++] = (uint64_t)MAX(0, rnd[j]);
+            ticks[cur++] = (uint64_t)MAX(0, rnd[j]) * cpu_mhz * 1e6;
     }
     vdRngGaussian(VSL_RNG_METHOD_GAUSSIAN_BOXMULLER2, stream,
                   each, rnd, mean, stddev);
     for (j = 0;  j < each;  j++)
-        ticks[cur++] = (uint64_t)MAX(0, rnd[j]);
+        ticks[cur++] = (uint64_t)MAX(0, rnd[j]) * cpu_mhz * 1e6;
 
     vslDeleteStream(&stream);
     _mm_free(rnd);
