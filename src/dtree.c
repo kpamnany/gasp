@@ -256,8 +256,8 @@ static void init_distrib_fractions(dtree_t *dt)
         /* at leaf ranks, we give all the work */
         dt->distrib_fractions[0] = 1.0;
 
-        /* report rank multiplier */
-        if (dt->parent != -1)
+        /* report rank multiplier to parent */
+        if (dt->g->rank != 0)
             MPI_Send(&dt->rank_mul, 1, MPI_DOUBLE, dt->parent, 0, MPI_COMM_WORLD);
     }
 
@@ -313,6 +313,10 @@ int dtree_create(gasp_t *g,
         int *is_parent_)
 {
     *dt_ = NULL;
+
+    /* sanity checks */
+    assert(first_ > 0.0  &&  first_ <= 1.0  &&  rest_ > 0.0  &&  rest_ <= 1.0);
+    assert(min_distrib_ >= 1);
 
     dtree_t *dt = (dtree_t *)_mm_malloc(sizeof (dtree_t), 64);
     if (dt == NULL)
@@ -528,7 +532,7 @@ void dtree_destroy(dtree_t *dt)
 
 /*  dtree_initwork() -- initialization: set up distribution fractions and
         initial work allocations (rank 0 has all the work, other ranks ask
-        their parents).
+        their parents, requests flow up, work flows down).
  */
 int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item)
 {
@@ -540,63 +544,84 @@ int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item)
     /* set up child distribution fractions */
     init_distrib_fractions(dt);
 
-    /* post receives for children to request work */
-    for (i = 0;  i < dt->num_children;  i++)
-        MPI_Irecv(&dt->children_req_bufs[i], 1, MPI_SHORT, dt->children[i], 0,
-                  MPI_COMM_WORLD, &dt->children_reqs[i]);
+    /* parents wait for children to ask for work and aggregate the requests */
+    int16_t req_items = dt->min_distrib;
+    int64_t work[2];
+    if (dt->num_children > 0) {
+        for (i = 0;  i < dt->num_children;  i++)
+            MPI_Irecv(&dt->children_req_bufs[i], 1, MPI_SHORT, dt->children[i], 0,
+                      MPI_COMM_WORLD, &dt->children_reqs[i]);
+        MPI_Waitall(dt->num_children, dt->children_reqs, MPI_STATUSES_IGNORE);
+        for (i = 0;  i < dt->num_children;  i++)
+            req_items += dt->children_req_bufs[i];
+    }
 
     /* all ranks except the root ask their parent for work */
     if (dt->g->rank != 0) {
-        int64_t work[2];
-
-        DTREE_TRACE(dt, "[%04d] initwork: asking [%04d] for work\n",
-                dt->g->rank, dt->parent);
-
+        DTREE_TRACE(dt, "[%04d] initwork: asking [%04d] for %d work items\n",
+                dt->g->rank, dt->parent, req_items);
         MPI_Irecv(&work, 2, MPI_LONG, dt->parent, 0, MPI_COMM_WORLD, &dt->parent_req);
-        MPI_Send(&dt->min_distrib, 1, MPI_SHORT, dt->parent, 0, MPI_COMM_WORLD);
+        MPI_Send(&req_items, 1, MPI_SHORT, dt->parent, 0, MPI_COMM_WORLD);
         MPI_Wait(&dt->parent_req, MPI_STATUS_IGNORE);
 
         dt->next_work_item = dt->first_work_item = work[0];
         dt->last_work_item = work[1];
 
         DTREE_TRACE(dt, "[%04d] init: got %llu items (%llu to %llu)\n",
-                dt->g->rank, dt->last_work_item - dt->next_work_item,
+                dt->g->rank, dt->last_work_item - dt->first_work_item,
                 dt->first_work_item, dt->last_work_item);
     }
 
-    /* determine and scale with `first`, how much work is available */
-    int64_t my_items = 0, avail_items = dt->last_work_item - dt->first_work_item;
-    if (dt->num_children > 0) avail_items *= dt->first;
-    if (dt->num_children == 0  ||  dt->parents_work) {
-        my_items = MAX(avail_items * dt->distrib_fractions[0], dt->min_distrib);
-        *first_item = dt->next_work_item;
-        dt->next_work_item += my_items;
-        *last_item = dt->next_work_item;
-        dt->first_work_item += my_items;
+    /* determine how much initial work is available */
+    int64_t avail_items = dt->last_work_item - dt->first_work_item;
+
+    /* parents scale the initial distribution, if possible */
+    if (dt->num_children > 0) {
+        if (avail_items * dt->first >= req_items)
+            avail_items *= dt->first;
+        else if (avail_items >= req_items)
+            DTREE_TRACE(dt, "[%04d] init: not enough work, discarding `first` scaling\n",
+                        dt->g->rank);
+        else
+            DTREE_TRACE(dt, "[%04d] init: not enough work, some children will idle!\n",
+                        dt->g->rank);
     }
 
-    /* if I have children, distribute work to them */
-    if (dt->num_children > 0) {
-        MPI_Waitall(dt->num_children, dt->children_reqs, MPI_STATUSES_IGNORE);
+    /* parents distribute work to their children */
+    int64_t this_child;
+    for (i = 0;  i < dt->num_children;  i++) {
+        this_child = MIN(dt->last_work_item - dt->next_work_item,
+                         MAX(avail_items * dt->distrib_fractions[i+1], dt->min_distrib));
 
-        for (i = 0;  i < dt->num_children;  i++) {
-            int64_t this_child = MAX(avail_items * dt->distrib_fractions[i+1],
-                                     dt->min_distrib);
-
-            int64_t work[2];
+        if (this_child > 0) {
             work[0] = dt->next_work_item;
             dt->next_work_item += this_child;
             work[1] = dt->next_work_item;
+        }
+        else
+            work[0] = work[1] = 0;
 
-            DTREE_TRACE(dt, "[%04d] init: feeding %ld items to [%04d]\n",
-                    dt->g->rank, this_child, dt->children[i]);
+        DTREE_TRACE(dt, "[%04d] init: feeding %ld items to [%04d]\n",
+                dt->g->rank, this_child, dt->children[i]);
 
-            MPI_Send(work, 2, MPI_LONG, dt->children[i], 0, MPI_COMM_WORLD);
+        MPI_Send(work, 2, MPI_LONG, dt->children[i], 0, MPI_COMM_WORLD);
+        if (this_child > 0)
             MPI_Irecv(&dt->children_req_bufs[i], 1, MPI_SHORT, dt->children[i], 0,
                       MPI_COMM_WORLD, &dt->children_reqs[i]);
+    }
 
-            dt->first_work_item += this_child;
+    /* all working ranks (parents and children) keep themselves some work */
+    int64_t my_items = 0;
+    if (dt->num_children == 0  ||  dt->parents_work) {
+        my_items = MIN(dt->last_work_item - dt->next_work_item, 
+                       MAX(avail_items * dt->distrib_fractions[0], dt->min_distrib));
+        if (my_items > 0) {
+            *first_item = dt->next_work_item;
+            dt->next_work_item += my_items;
+            *last_item = dt->next_work_item;
         }
+        else
+            *first_item = *last_item = 0;
     }
 
     return my_items;
