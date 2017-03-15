@@ -7,6 +7,7 @@
 #include <mpi.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sched.h>
 #include <immintrin.h>
 
 #include "gasp.h"
@@ -107,6 +108,8 @@ inline void __attribute__((always_inline)) cpu_pause()
 }
 
 
+/*  start_sde_tracing()
+ */
 inline void __attribute__((always_inline)) start_sde_tracing()
 {
 #ifdef SDE_TRACING
@@ -115,10 +118,25 @@ inline void __attribute__((always_inline)) start_sde_tracing()
 }
 
 
+/*  stop_sde_tracing()
+ */
 inline void __attribute__((always_inline)) stop_sde_tracing()
 {
 #ifdef SDE_TRACING
     __SSC_MARK(0x222);
 #endif
+}
+
+
+/*  set_affinity()
+ */
+int set_affinity(int cpu)
+{
+    cpu_set_t set;
+    int r;
+
+    CPU_ZERO(&set);
+    CPU_SET(cpu, &set);
+    return sched_setaffinity(0, sizeof (cpu_set_t), &set);
 }
 

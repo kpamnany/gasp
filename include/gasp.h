@@ -122,6 +122,8 @@ uint64_t rdtsc();
 void     cpu_pause();
 void     start_sde_tracing();
 void     stop_sde_tracing();
+int      set_affinity(int cpu);
+
 
 #endif  /* _GASP_H */
 
