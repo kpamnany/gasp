@@ -133,10 +133,28 @@ inline void __attribute__((always_inline)) stop_sde_tracing()
 int set_affinity(int cpu)
 {
     cpu_set_t set;
-    int r;
 
     CPU_ZERO(&set);
     CPU_SET(cpu, &set);
     return sched_setaffinity(0, sizeof (cpu_set_t), &set);
+}
+
+
+#include <pthread.h>
+#include <string.h>
+void show_affinity_mask(int tid)
+{
+    char buf[4096], tmp[128];
+    sprintf(buf, "<%d>: ", tid);
+    cpu_set_t set;
+    CPU_ZERO(&set);
+    pthread_getaffinity_np(pthread_self(), sizeof (cpu_set_t), &set);
+    for (int i = 0;  i < CPU_SETSIZE;  ++i) {
+        if (CPU_ISSET(i, &set)) {
+            sprintf(tmp, "%d ", i);
+            strcat(buf, tmp);
+        }
+    }
+    puts(buf);
 }
 
