@@ -157,6 +157,13 @@ int garray_get(garray_t *ga, int64_t lo, int64_t hi, void *buf_)
             tlorank, tloidx, thirank, thiidx, trank, tidx, n, oidx = 0;
     int8_t *buf = (int8_t *)buf_;
 
+    if (lo < 0 || lo >= ga->num_elems || hi < 0 || hi >= ga->num_elems) {
+        LOG_ERR(ga->g->glog, "[%d] garray get: invalid lo/hi index: "
+                "%" PRId64 "-%" PRId64 " of %" PRId64 " elements\n",
+                ga->g->rank, lo, hi, ga->num_elems);
+        return -1;
+    }
+
     calc_target(ga, lo, &tlorank, &tloidx);
     calc_target(ga, hi, &thirank, &thiidx);
 
@@ -231,6 +238,13 @@ int garray_put(garray_t *ga, int64_t lo, int64_t hi, void *buf_)
     int64_t count = (hi - lo) + 1, length = count * ga->elem_size,
             tlorank, tloidx, thirank, thiidx, trank, tidx, n, oidx = 0;
     int8_t *buf = (int8_t *)buf_;
+
+    if (lo < 0 || lo >= ga->num_elems || hi < 0 || hi >= ga->num_elems) {
+        LOG_ERR(ga->g->glog, "[%d] garray put: invalid lo/hi index: "
+                "%" PRId64 "-%" PRId64 " of %" PRId64 " elements\n",
+                ga->g->rank, lo, hi, ga->num_elems);
+        return -1;
+    }
 
     calc_target(ga, lo, &tlorank, &tloidx);
     calc_target(ga, hi, &thirank, &thiidx);
