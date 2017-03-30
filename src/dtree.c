@@ -221,9 +221,31 @@ static void build_tree(dtree_t *dt, int fan_out, int can_parent)
         else {
             dt->my_level = 2;
             dt->parent = -1;
-            int d = result.quot;
-            if (result.rem > 0) ++d;
-            int parent_idx = (ccount / d) + 1;
+
+            /* if children are equally distributed, the parent is easy
+               to determine */
+            int parent_idx;
+            if (result.rem == 0) {
+                parent_idx = (ccount / result.quot) + 1;
+                DTREE_TRACE(dt, "[%04d] equal child distribution; parent is "
+                            "[%04d]\n", dt->g->rank, parent_idx);
+            }
+
+            /* otherwise, since children are balanced as much as possible,
+               it's a bit trickier */
+            else {
+                int first_nchildren = result.quot + 1,
+                    rest_nchildren = result.quot;
+                parent_idx = (ccount / first_nchildren) + 1;
+                if (parent_idx > result.rem) {
+                    ccount -= result.rem * first_nchildren;
+                    parent_idx = (ccount / rest_nchildren) + result.rem + 1;
+                }
+                DTREE_TRACE(dt, "[%04d] unequal child distribution; parent is "
+                            "[%04d]\n", dt->g->rank, parent_idx);
+            }
+
+            /* find the parent_idx'th rank */
             int p = 0;
             for (i = 0;  i < dt->g->nranks;  ++i) {
                 if (rank_can_parent[i]) {
@@ -554,6 +576,8 @@ int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item)
         MPI_Waitall(dt->num_children, dt->children_reqs, MPI_STATUSES_IGNORE);
         for (i = 0;  i < dt->num_children;  i++)
             req_items += dt->children_req_bufs[i];
+        DTREE_TRACE(dt, "[%04d] initwork: %d children requested %d items\n",
+                    dt->g->rank, dt->num_children, req_items);
     }
 
     /* all ranks except the root ask their parent for work */
