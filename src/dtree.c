@@ -227,8 +227,6 @@ static void build_tree(dtree_t *dt, int fan_out, int can_parent)
             int parent_idx;
             if (result.rem == 0) {
                 parent_idx = (ccount / result.quot) + 1;
-                DTREE_TRACE(dt, "[%04d] equal child distribution; parent is "
-                            "[%04d]\n", dt->g->rank, parent_idx);
             }
 
             /* otherwise, since children are balanced as much as possible,
@@ -241,8 +239,6 @@ static void build_tree(dtree_t *dt, int fan_out, int can_parent)
                     ccount -= result.rem * first_nchildren;
                     parent_idx = (ccount / rest_nchildren) + result.rem + 1;
                 }
-                DTREE_TRACE(dt, "[%04d] unequal child distribution; parent is "
-                            "[%04d]\n", dt->g->rank, parent_idx);
             }
 
             /* find the parent_idx'th rank */
