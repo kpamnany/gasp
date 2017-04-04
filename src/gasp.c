@@ -132,11 +132,15 @@ inline void __attribute__((always_inline)) stop_sde_tracing()
  */
 int set_affinity(int cpu)
 {
+#ifdef __linux__
     cpu_set_t set;
 
     CPU_ZERO(&set);
     CPU_SET(cpu, &set);
     return sched_setaffinity(0, sizeof (cpu_set_t), &set);
+#else
+    return -1;
+#endif
 }
 
 
@@ -144,6 +148,7 @@ int set_affinity(int cpu)
 #include <string.h>
 void show_affinity_mask(int tid)
 {
+#ifdef __linux__
     char buf[4096], tmp[128];
     sprintf(buf, "<%d>: ", tid);
     cpu_set_t set;
@@ -156,5 +161,6 @@ void show_affinity_mask(int tid)
         }
     }
     puts(buf);
+#endif
 }
 
