@@ -25,6 +25,9 @@ CFLAGS+=-I../src
 ifdef $(INCLUDE)
     CFLAGS+=-I$(INCLUDE)
 endif
+ifdef TRACE_DTREE
+    CFLAGS+=-DTRACE_DTREE=$(TRACE_DTREE)
+endif
 
 ifeq ($(CRAY),yes)
     CC=cc
@@ -34,7 +37,6 @@ ifeq ($(CRAY),yes)
     LDFLAGS+=-L..
     LDFLAGS+=-lgasp
     LDFLAGS+=-Wl,--whole-archive,-ldmapp,--no-whole-archive
-    LDFLAGS+=-Wl,-rpath=/global/u1/k/kpamnany/mpich2-intel/lib
 else
 ifeq ($(shell uname), Darwin)
     #LDFLAGS+=-dynamic

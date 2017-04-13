@@ -34,7 +34,6 @@ ifeq ($(CRAY),yes)
     #CFLAGS+=-craympich-mt
     CFLAGS+=-DSDE_TRACING=1
     LDFLAGS+=-Wl,--whole-archive,-ldmapp,--no-whole-archive
-    LDFLAGS+=-Wl,-rpath=/global/u1/k/kpamnany/mpich2-intel/lib
 endif
 
 ifeq ($(INTEL),yes)

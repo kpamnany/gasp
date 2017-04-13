@@ -562,16 +562,21 @@ int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item)
     /* set up child distribution fractions */
     init_distrib_fractions(dt);
 
+    /* allocate space for larger requests than usual */
+    int32_t *req_bufs = (int32_t *)calloc(dt->num_children, sizeof (int32_t));
+    MPI_Request *reqs = (MPI_Request *)
+            calloc(dt->num_children, sizeof (MPI_Request));
+
     /* parents wait for children to ask for work and aggregate the requests */
-    int16_t req_items = dt->min_distrib;
+    int32_t req_items = dt->min_distrib;
     int64_t work[2];
     if (dt->num_children > 0) {
         for (i = 0;  i < dt->num_children;  i++)
-            MPI_Irecv(&dt->children_req_bufs[i], 1, MPI_SHORT, dt->children[i], 0,
-                      MPI_COMM_WORLD, &dt->children_reqs[i]);
-        MPI_Waitall(dt->num_children, dt->children_reqs, MPI_STATUSES_IGNORE);
+            MPI_Irecv(&req_bufs[i], 1, MPI_INT, dt->children[i], 0,
+                      MPI_COMM_WORLD, &reqs[i]);
+        MPI_Waitall(dt->num_children, reqs, MPI_STATUSES_IGNORE);
         for (i = 0;  i < dt->num_children;  i++)
-            req_items += dt->children_req_bufs[i];
+            req_items += req_bufs[i];
         DTREE_TRACE(dt, "[%04d] initwork: %d children requested %d items\n",
                     dt->g->rank, dt->num_children, req_items);
     }
@@ -580,8 +585,9 @@ int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item)
     if (dt->g->rank != 0) {
         DTREE_TRACE(dt, "[%04d] initwork: asking [%04d] for %d work items\n",
                 dt->g->rank, dt->parent, req_items);
-        MPI_Irecv(&work, 2, MPI_LONG, dt->parent, 0, MPI_COMM_WORLD, &dt->parent_req);
-        MPI_Send(&req_items, 1, MPI_SHORT, dt->parent, 0, MPI_COMM_WORLD);
+        MPI_Irecv(&work, 2, MPI_LONG, dt->parent, 0,
+                  MPI_COMM_WORLD, &dt->parent_req);
+        MPI_Send(&req_items, 1, MPI_INT, dt->parent, 0, MPI_COMM_WORLD);
         MPI_Wait(&dt->parent_req, MPI_STATUS_IGNORE);
 
         dt->next_work_item = dt->first_work_item = work[0];
@@ -599,19 +605,22 @@ int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item)
     if (dt->num_children > 0) {
         if (avail_items * dt->first >= req_items)
             avail_items *= dt->first;
-        else if (avail_items >= req_items)
-            DTREE_TRACE(dt, "[%04d] init: not enough work, discarding `first` scaling\n",
-                        dt->g->rank);
+        else if (avail_items >= req_items) {
+            avail_items = req_items;
+            DTREE_TRACE(dt, "[%04d] init: not enough work, discarding `first` "
+                        "scaling\n", dt->g->rank);
+        }
         else
-            DTREE_TRACE(dt, "[%04d] init: not enough work, some children will idle!\n",
-                        dt->g->rank);
+            DTREE_TRACE(dt, "[%04d] init: not enough work, some children will "
+                        "idle!\n", dt->g->rank);
     }
 
     /* parents distribute work to their children */
     int64_t this_child;
     for (i = 0;  i < dt->num_children;  i++) {
         this_child = MIN(dt->last_work_item - dt->next_work_item,
-                         MAX(avail_items * dt->distrib_fractions[i+1], dt->min_distrib));
+                         MAX(avail_items * dt->distrib_fractions[i+1],
+                             dt->min_distrib));
 
         if (this_child > 0) {
             work[0] = dt->next_work_item;
@@ -643,6 +652,9 @@ int64_t dtree_initwork(dtree_t *dt, int64_t *first_item, int64_t *last_item)
         else
             *first_item = *last_item = 0;
     }
+
+    free(reqs);
+    free(req_bufs);
 
     return my_items;
 }
