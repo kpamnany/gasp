@@ -188,8 +188,6 @@ int main(int argc, char **argv)
     num_items = dtree_initwork(scheduler, &cur_item, &last_item);
     int run_dtree = dtree_run(scheduler);
 
-    DTREE_TRACE(scheduler, "[%04d] init: %lld \n", my_rank, num_items);
-
     uint64_t tinit_done = rdtsc();
     uint64_t wi_done = num_items;
 
